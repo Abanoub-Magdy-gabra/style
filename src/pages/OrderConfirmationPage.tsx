@@ -42,6 +42,7 @@ export default function OrderConfirmationPage() {
   const status = location.state?.status || 'succeeded';
   const lastFour = location.state?.lastFour || '';
   const cardType = location.state?.cardType || 'Card';
+  const isDemoMode = location.state?.isDemoMode || true;
 
   // If no order details in location state, redirect to home
   useEffect(() => {
@@ -88,27 +89,51 @@ export default function OrderConfirmationPage() {
   return (
     <div className="bg-neutral-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
+        {/* DEMO MODE WARNING */}
+        {isDemoMode && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-8">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-bold text-red-800">🎭 DEMO ORDER - NO REAL PAYMENT PROCESSED</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  This is a demonstration order. No actual payment was charged and no real products will be shipped.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-8">
           <div className="px-4 py-5 sm:px-6 bg-primary-50">
             <div className="flex items-center">
               <CheckCircleIcon className="h-8 w-8 text-green-600 mr-3" />
-              <h1 className="text-2xl font-bold text-neutral-900">
-                Thank you for your order!
-              </h1>
-              <div className="mt-2">
-                <p className="text-sm text-neutral-600">
-                  {cardType} ending in ••••{lastFour || paymentId.slice(-4)}
-                </p>
-                <p className="text-sm text-neutral-600">
-                  {status === 'succeeded' ? 'Paid' : 'Pending'}
-                </p>
+              <div>
+                <h1 className="text-2xl font-bold text-neutral-900">
+                  {isDemoMode ? '🎭 Demo Order Completed!' : 'Thank you for your order!'}
+                </h1>
+                <div className="mt-2">
+                  <p className="text-sm text-neutral-600">
+                    {cardType} ending in ••••{lastFour || paymentId.slice(-4)}
+                  </p>
+                  <p className="text-sm text-neutral-600">
+                    {isDemoMode ? '🎭 Demo Payment (No Real Charge)' : (status === 'succeeded' ? 'Paid' : 'Pending')}
+                  </p>
+                </div>
               </div>
             </div>
             <p className="mt-1 text-sm text-neutral-600">
-              Order #{orderId} has been placed and is being processed.
+              Order #{orderId} has been {isDemoMode ? 'simulated' : 'placed'} and is being processed.
             </p>
             <p className="mt-2 text-sm text-neutral-600">
-              We've sent a confirmation email with order details and tracking information.
+              {isDemoMode 
+                ? '🎭 This is a demo confirmation. No real order was placed or payment processed.'
+                : "We've sent a confirmation email with order details and tracking information."
+              }
             </p>
           </div>
           
@@ -119,8 +144,11 @@ export default function OrderConfirmationPage() {
                 <div className="space-y-1 text-sm text-neutral-700">
                   <p><span className="font-medium">Order Number:</span> {orderId}</p>
                   <p><span className="font-medium">Date:</span> {new Date().toLocaleDateString()}</p>
-                  <p><span className="font-medium">Payment Method:</span> {paymentMethod}</p>
+                  <p><span className="font-medium">Payment Method:</span> {paymentMethod} {isDemoMode ? '(Demo)' : ''}</p>
                   <p><span className="font-medium">Payment ID:</span> {paymentId}</p>
+                  {isDemoMode && (
+                    <p className="text-red-600 font-medium">⚠️ Demo Mode: No real payment processed</p>
+                  )}
                 </div>
               </div>
               
@@ -209,7 +237,7 @@ export default function OrderConfirmationPage() {
                     </tr>
                     <tr className="border-t border-neutral-200">
                       <td colSpan={3} className="px-6 py-3 text-right text-base font-bold text-neutral-900">
-                        Total
+                        Total {isDemoMode ? '(Demo)' : ''}
                       </td>
                       <td className="px-6 py-3 text-right text-base font-bold text-neutral-900">
                         ${total.toFixed(2)}
@@ -222,18 +250,31 @@ export default function OrderConfirmationPage() {
             
             <div className="mt-8 pt-8 border-t border-neutral-200">
               <h2 className="text-lg font-medium text-neutral-900 mb-4">What's Next?</h2>
-              <div className="bg-blue-50 rounded-lg p-4">
+              <div className={`${isDemoMode ? 'bg-red-50' : 'bg-blue-50'} rounded-lg p-4`}>
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <TruckIcon className="h-5 w-5 text-blue-400" />
+                    <TruckIcon className={`h-5 w-5 ${isDemoMode ? 'text-red-400' : 'text-blue-400'}`} />
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-blue-800">Order Status</h3>
-                    <div className="mt-2 text-sm text-blue-700">
-                      <p>Your order is being processed and will be shipped soon.</p>
-                      <p className="mt-1">
-                        Estimated delivery: <span className="font-medium">{formatDeliveryDate()}</span>
-                      </p>
+                    <h3 className={`text-sm font-medium ${isDemoMode ? 'text-red-800' : 'text-blue-800'}`}>
+                      {isDemoMode ? '🎭 Demo Order Status' : 'Order Status'}
+                    </h3>
+                    <div className={`mt-2 text-sm ${isDemoMode ? 'text-red-700' : 'text-blue-700'}`}>
+                      {isDemoMode ? (
+                        <>
+                          <p>This is a demonstration order - no real products will be shipped.</p>
+                          <p className="mt-1 font-medium">
+                            Demo estimated delivery: <span className="font-medium">{formatDeliveryDate()}</span>
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p>Your order is being processed and will be shipped soon.</p>
+                          <p className="mt-1">
+                            Estimated delivery: <span className="font-medium">{formatDeliveryDate()}</span>
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -241,7 +282,7 @@ export default function OrderConfirmationPage() {
               
               <div className="mt-6 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
                 <Link
-                  to="/products"
+                  to="/shop"
                   className="flex-1 flex items-center justify-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Continue Shopping
@@ -263,7 +304,7 @@ export default function OrderConfirmationPage() {
           </div>
           <div className="border-t border-neutral-200 px-4 py-5 sm:p-6">
             <p className="text-sm text-neutral-700 mb-4">
-              If you have any questions about your order, please don't hesitate to contact our customer service team.
+              If you have any questions about your {isDemoMode ? 'demo ' : ''}order, please don't hesitate to contact our customer service team.
             </p>
             <div className="space-y-3">
               <a href="mailto:support@stylesphere.com" className="block text-sm font-medium text-primary-600 hover:text-primary-500">

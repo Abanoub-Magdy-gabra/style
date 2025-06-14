@@ -165,28 +165,34 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
     setErrors({});
 
     try {
-      // Simulate payment processing with shorter timeout
+      // ⚠️ CRITICAL: THIS IS DEMO MODE ONLY - NO REAL PAYMENT PROCESSING ⚠️
+      console.log('🚫 DEMO MODE: NO REAL PAYMENT WILL BE PROCESSED');
+      console.log('🎭 Simulating payment for demonstration purposes only');
+      
+      // Simulate payment processing delay
       const processingTime = Math.random() * 1000 + 500; // 500ms to 1.5s
       await new Promise(resolve => setTimeout(resolve, processingTime));
       
-      // Simulate occasional failures (2% chance)
-      if (Math.random() < 0.02) {
-        throw new Error('Payment declined. Please check your card details and try again.');
-      }
-      
+      // Generate demo payment result (NO REAL TRANSACTION OCCURS)
       const paymentResult = {
-        paymentId: `pay_${Math.random().toString(36).substr(2, 16)}`,
-        status: 'succeeded',
+        paymentId: `DEMO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        status: 'demo_success',
         timestamp: new Date().toISOString(),
         lastFour: formData.cardNumber.replace(/\s/g, '').slice(-4),
-        cardType: getCardType(formData.cardNumber)
+        cardType: getCardType(formData.cardNumber),
+        isDemoMode: true,
+        realPayment: false, // Explicitly mark as not real
+        demoNotice: 'This is a demonstration - no actual payment was processed'
       };
+      
+      console.log('🎭 DEMO: Payment simulation completed successfully');
+      console.log('💡 No money was charged - this is for demonstration only');
       
       onSuccess(paymentResult);
       
     } catch (err) {
-      console.error('Payment error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Payment processing failed. Please try again.';
+      console.error('Demo payment simulation error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Demo payment simulation failed. Please try again.';
       setErrors({
         payment: errorMessage
       });
@@ -209,11 +215,32 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* PROMINENT DEMO NOTICE */}
+      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="h-6 w-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-lg font-bold text-red-800">⚠️ DEMO MODE - NO REAL PAYMENTS ⚠️</h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p className="font-semibold">This is a demonstration checkout system.</p>
+              <p>• No real payment will be processed</p>
+              <p>• No money will be charged to any card</p>
+              <p>• Use any test card details (e.g., 4242 4242 4242 4242)</p>
+              <p>• This is for demonstration purposes only</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="border border-neutral-200 rounded-md p-4 space-y-4">
           <div>
             <label htmlFor="cardNumber" className="block text-sm font-medium text-neutral-700 mb-1">
-              Card number
+              Card number (Demo - use any 16 digits)
             </label>
             <input
               type="text"
@@ -226,7 +253,7 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
               }}
               onBlur={handleBlur}
               maxLength={19}
-              placeholder="0000 0000 0000 0000"
+              placeholder="4242 4242 4242 4242"
               disabled={isFormDisabled}
               className={`mt-1 block w-full rounded-md border ${
                 errors.cardNumber ? 'border-red-500' : 'border-neutral-300'
@@ -239,7 +266,7 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
           
           <div>
             <label htmlFor="cardName" className="block text-sm font-medium text-neutral-700 mb-1">
-              Name on card
+              Name on card (Demo - any name)
             </label>
             <input
               type="text"
@@ -262,7 +289,7 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="expiryDate" className="block text-sm font-medium text-neutral-700 mb-1">
-                Expiry date
+                Expiry date (Demo)
               </label>
               <input
                 type="text"
@@ -275,7 +302,7 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
                 }}
                 onBlur={handleBlur}
                 maxLength={5}
-                placeholder="MM/YY"
+                placeholder="12/28"
                 disabled={isFormDisabled}
                 className={`mt-1 block w-full rounded-md border ${
                 errors.expiryDate ? 'border-red-500' : 'border-neutral-300'
@@ -288,7 +315,7 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
             
             <div>
               <label htmlFor="cvv" className="block text-sm font-medium text-neutral-700 mb-1">
-                CVV
+                CVV (Demo)
               </label>
               <input
                 type="text"
@@ -322,7 +349,7 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
             disabled={isFormDisabled}
           />
           <label htmlFor="save-card" className="ml-2 block text-sm text-neutral-700">
-            Save card for future purchases
+            Save card for future purchases (Demo only - not functional)
           </label>
         </div>
         
@@ -347,22 +374,22 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Processing...
+              🎭 Simulating Payment...
             </>
           ) : (
-            'Pay Now'
+            '🎭 Complete Demo Order (No Real Payment)'
           )}
         </button>
         
-        <p className="mt-3 text-center text-sm text-neutral-500">
-          Your payment in {CURRENCY.name} ({CURRENCY.code}) is secured with 256-bit SSL encryption
+        <p className="mt-3 text-center text-sm text-red-600 font-semibold">
+          ⚠️ DEMO MODE - No real payment will be processed ⚠️
         </p>
         
         <div className="mt-6 flex justify-center space-x-6">
-          {['visa', 'mastercard', 'meeza', 'fawry'].map((type) => (
-            <div key={type} className="h-8 flex items-center">
-              <div className="text-xs font-medium text-neutral-400">
-                {type.charAt(0).toUpperCase() + type.slice(1)}
+          {['Demo Only', 'No Real Charges', 'Test Mode'].map((text) => (
+            <div key={text} className="h-8 flex items-center">
+              <div className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded">
+                {text}
               </div>
             </div>
           ))}
