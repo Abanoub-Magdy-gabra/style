@@ -3,20 +3,38 @@ import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  phone?: string | null;
+  date_of_birth?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<boolean>;
+  resetPassword: (email: string) => Promise<boolean>;
+  updatePassword: (newPassword: string) => Promise<boolean>;
+  deleteAccount: () => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,6 +43,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        loadUserProfile(session.user.id);
+      }
       setIsLoading(false);
     });
 
@@ -34,16 +55,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setIsLoading(false);
-
+      
       if (event === 'SIGNED_IN' && session?.user) {
-        // Create or update profile
         await createOrUpdateProfile(session.user);
+        await loadUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null);
       }
+      
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading profile:', error);
+        return;
+      }
+
+      if (data) {
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error in loadUserProfile:', error);
+    }
+  };
 
   const createOrUpdateProfile = async (user: User) => {
     try {
@@ -100,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast.error(error.message);
       } else {
         toast.success('Logged out successfully');
+        setProfile(null);
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -126,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
-        toast.success('Account created successfully! Please check your email to verify your account.');
+        toast.success('Account created successfully!');
         return true;
       }
 
@@ -140,15 +186,112 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateProfile = async (updates: Partial<UserProfile>): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        toast.error('Failed to update profile');
+        return false;
+      }
+
+      await loadUserProfile(user.id);
+      toast.success('Profile updated successfully');
+      return true;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      toast.error('An unexpected error occurred');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+
+      toast.success('Password reset email sent');
+      return true;
+    } catch (error) {
+      console.error('Reset password error:', error);
+      toast.error('An unexpected error occurred');
+      return false;
+    }
+  };
+
+  const updatePassword = async (newPassword: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+
+      toast.success('Password updated successfully');
+      return true;
+    } catch (error) {
+      console.error('Update password error:', error);
+      toast.error('An unexpected error occurred');
+      return false;
+    }
+  };
+
+  const deleteAccount = async (): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      // Note: Supabase doesn't have a direct delete user method from client
+      // This would typically be handled by a server function
+      toast.error('Account deletion must be requested through customer support');
+      return false;
+    } catch (error) {
+      console.error('Delete account error:', error);
+      toast.error('An unexpected error occurred');
+      return false;
+    }
+  };
+
+  const refreshProfile = async (): Promise<void> => {
+    if (user) {
+      await loadUserProfile(user.id);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
+      profile,
       session,
       isAuthenticated: !!user,
       isLoading,
       login,
       logout,
-      register
+      register,
+      updateProfile,
+      resetPassword,
+      updatePassword,
+      deleteAccount,
+      refreshProfile
     }}>
       {children}
     </AuthContext.Provider>
