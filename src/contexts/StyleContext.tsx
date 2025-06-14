@@ -56,24 +56,25 @@ export const StyleProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await supabase
         .from('style_preferences')
         .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error loading style preferences:', error);
         return;
       }
 
-      if (data) {
+      // Check if data exists and has at least one record
+      if (data && data.length > 0) {
+        const userPreferences = data[0]; // Get the first (and should be only) record
         setPreferences({
-          colors: data.colors || [],
-          patterns: data.patterns || [],
-          fits: data.fits || [],
-          occasions: data.occasions || [],
-          favorites: data.favorites || [],
-          bodyType: data.body_type || undefined,
-          size: data.size || undefined,
-          stylePersona: data.style_persona || undefined,
+          colors: userPreferences.colors || [],
+          patterns: userPreferences.patterns || [],
+          fits: userPreferences.fits || [],
+          occasions: userPreferences.occasions || [],
+          favorites: userPreferences.favorites || [],
+          bodyType: userPreferences.body_type || undefined,
+          size: userPreferences.size || undefined,
+          stylePersona: userPreferences.style_persona || undefined,
         });
         setHasCompletedStyleQuiz(true);
       }

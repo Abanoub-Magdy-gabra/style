@@ -30,9 +30,8 @@ export default function LoginPage() {
       if (success) {
         // Redirect to the previous page or home
         navigate(from, { replace: true });
-      } else {
-        setError('Invalid email or password');
       }
+      // Remove the generic error message - let useAuth handle specific error messages via toast
     } catch (err) {
       setError('An error occurred. Please try again.');
       console.error('Login error:', err);
