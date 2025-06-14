@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBagIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../utils/currencyUtils';
 
 // Define the Order type
@@ -14,8 +16,9 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  orderNumber: string;
   date: string;
-  status: 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'demo';
   total: number;
   items: OrderItem[];
   shippingAddress: {
@@ -36,27 +39,117 @@ interface Order {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated } = useAuth();
 
-  // Fetch orders from local storage or mock data
+  // Fetch orders from Supabase and localStorage
   useEffect(() => {
-    // In a real app, this would be an API call
     const fetchOrders = async () => {
       try {
         setIsLoading(true);
-        
-        // Check if we have any orders in localStorage
-        const storedOrders = localStorage.getItem('orders');
         let ordersData: Order[] = [];
-        
+
+        // If user is authenticated, fetch from Supabase
+        if (isAuthenticated && user) {
+          console.log('Fetching orders from Supabase for user:', user.id);
+          
+          const { data: supabaseOrders, error } = await supabase
+            .from('orders')
+            .select(`
+              id,
+              order_number,
+              status,
+              total_amount,
+              shipping_address,
+              payment_method,
+              created_at,
+              order_items (
+                id,
+                quantity,
+                price,
+                size,
+                color,
+                products (
+                  id,
+                  name,
+                  images
+                )
+              )
+            `)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            console.error('Error fetching orders from Supabase:', error);
+          } else if (supabaseOrders) {
+            console.log('Fetched orders from Supabase:', supabaseOrders);
+            
+            // Transform Supabase data to our Order format
+            ordersData = supabaseOrders.map((order: any) => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              date: order.created_at,
+              status: order.status,
+              total: order.total_amount,
+              items: order.order_items?.map((item: any) => ({
+                id: item.products?.id || item.id,
+                name: item.products?.name || 'Unknown Product',
+                price: item.price,
+                quantity: item.quantity,
+                image: item.products?.images?.[0],
+              })) || [],
+              shippingAddress: order.shipping_address || {},
+              paymentMethod: order.payment_method,
+              paymentId: `pay_${order.id.slice(-8)}`,
+              estimatedDelivery: formatDeliveryDate(order.status === 'delivered' ? -5 : 5),
+            }));
+          }
+        }
+
+        // Also check localStorage for backup orders
+        const storedOrders = localStorage.getItem('orders');
         if (storedOrders) {
-          ordersData = JSON.parse(storedOrders);
-        } else {
-          // If no orders in localStorage, use mock data
+          try {
+            const localOrders = JSON.parse(storedOrders);
+            console.log('Found orders in localStorage:', localOrders);
+            
+            // Convert localStorage format to our Order format
+            const formattedLocalOrders = localOrders.map((order: any) => ({
+              id: order.id || order.orderNumber,
+              orderNumber: order.orderNumber || order.id,
+              date: order.date,
+              status: order.status,
+              total: order.total,
+              items: order.items || [],
+              shippingAddress: order.shippingAddress || {},
+              paymentMethod: order.paymentMethod,
+              paymentId: order.paymentId,
+              estimatedDelivery: order.estimatedDelivery,
+            }));
+
+            // Merge with Supabase orders, avoiding duplicates
+            const existingOrderIds = new Set(ordersData.map(o => o.id));
+            const newLocalOrders = formattedLocalOrders.filter((order: Order) => 
+              !existingOrderIds.has(order.id)
+            );
+            
+            ordersData = [...ordersData, ...newLocalOrders];
+          } catch (error) {
+            console.error('Error parsing localStorage orders:', error);
+          }
+        }
+
+        // If no orders found, generate mock data for demo
+        if (ordersData.length === 0) {
+          console.log('No orders found, generating mock data');
           ordersData = generateMockOrders();
           // Save mock orders to localStorage for persistence
           localStorage.setItem('orders', JSON.stringify(ordersData));
         }
+
+        // Sort orders by date (newest first)
+        ordersData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
+        console.log('Final orders data:', ordersData);
         setOrders(ordersData);
       } catch (error) {
         console.error('Error fetching orders:', error);
@@ -66,78 +159,45 @@ export default function OrdersPage() {
     };
 
     fetchOrders();
-  }, []);
+  }, [user, isAuthenticated]);
 
   // Generate mock orders for demo purposes
   const generateMockOrders = (): Order[] => {
     const mockOrders: Order[] = [
       {
         id: 'order_' + Math.random().toString(36).substring(2, 11),
+        orderNumber: `ORD-${Date.now()}-DEMO1`,
         date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-        status: 'processing',
+        status: 'demo',
         total: 4500, // In EGP
         items: [
           {
-            id: 'product_1',
-            name: 'Premium Cotton T-Shirt',
+            id: 'p1',
+            name: 'Organic Cotton T-Shirt',
             price: 1500,
             quantity: 2,
-            image: '/images/products/tshirt.jpg'
+            image: 'https://images.pexels.com/photos/5698851/pexels-photo-5698851.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
           },
           {
-            id: 'product_2',
-            name: 'Slim Fit Jeans',
+            id: 'p2',
+            name: 'Recycled Denim Jeans',
             price: 1500,
             quantity: 1,
-            image: '/images/products/jeans.jpg'
+            image: 'https://images.pexels.com/photos/4210863/pexels-photo-4210863.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'
           }
         ],
         shippingAddress: {
-          firstName: 'John',
-          lastName: 'Doe',
-          address1: '123 Main St',
+          firstName: 'Demo',
+          lastName: 'User',
+          address1: '123 Demo Street',
           city: 'Cairo',
           state: 'Cairo',
           postalCode: '12345',
           country: 'Egypt'
         },
-        paymentMethod: 'card',
-        paymentId: 'pay_' + Math.random().toString(36).substring(2, 11),
+        paymentMethod: 'demo_card',
+        paymentId: 'DEMO_' + Math.random().toString(36).substring(2, 11),
         estimatedDelivery: formatDeliveryDate(5)
-      },
-      {
-        id: 'order_' + Math.random().toString(36).substring(2, 11),
-        date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 days ago
-        status: 'delivered',
-        total: 3000, // In EGP
-        items: [
-          {
-            id: 'product_3',
-            name: 'Casual Shirt',
-            price: 1800,
-            quantity: 1,
-            image: '/images/products/shirt.jpg'
-          },
-          {
-            id: 'product_4',
-            name: 'Leather Belt',
-            price: 1200,
-            quantity: 1,
-            image: '/images/products/belt.jpg'
-          }
-        ],
-        shippingAddress: {
-          firstName: 'John',
-          lastName: 'Doe',
-          address1: '123 Main St',
-          city: 'Cairo',
-          state: 'Cairo',
-          postalCode: '12345',
-          country: 'Egypt'
-        },
-        paymentMethod: 'card',
-        paymentId: 'pay_' + Math.random().toString(36).substring(2, 11),
-        estimatedDelivery: formatDeliveryDate(-10) // Already delivered
       }
     ];
     
@@ -178,6 +238,8 @@ export default function OrdersPage() {
         return 'bg-green-100 text-green-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'demo':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -185,6 +247,7 @@ export default function OrdersPage() {
 
   // Get status display text
   const getStatusText = (status: Order['status']) => {
+    if (status === 'demo') return 'Demo Order';
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
@@ -202,7 +265,16 @@ export default function OrdersPage() {
   return (
     <div className="bg-neutral-50 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-neutral-900 mb-8">My Orders</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-neutral-900">My Orders</h1>
+          {orders.some(order => order.status === 'demo') && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
+              <p className="text-sm text-purple-700">
+                🎭 Demo orders are shown for demonstration purposes
+              </p>
+            </div>
+          )}
+        </div>
         
         {orders.length === 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
@@ -210,7 +282,7 @@ export default function OrdersPage() {
             <h3 className="text-lg font-medium text-neutral-900 mb-2">No orders yet</h3>
             <p className="text-neutral-600 mb-6">You haven't placed any orders yet.</p>
             <Link
-              to="/products"
+              to="/shop"
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Start Shopping
@@ -228,7 +300,9 @@ export default function OrdersPage() {
                     <div className="px-4 py-5 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
                       <div className="mb-4 sm:mb-0">
                         <div className="flex items-center">
-                          <h3 className="text-lg font-medium text-neutral-900">Order #{order.id.split('_')[1]}</h3>
+                          <h3 className="text-lg font-medium text-neutral-900">
+                            Order #{order.orderNumber.split('-').pop() || order.id.split('_')[1]}
+                          </h3>
                           <span className={`ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                             {getStatusText(order.status)}
                           </span>

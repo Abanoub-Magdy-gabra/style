@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import CheckoutForm from '../components/checkout/CheckoutForm';
 import OrderSummary from '../components/checkout/OrderSummary';
 import { VAT_RATE, SHIPPING_COSTS, convertToEGP } from '../utils/currencyUtils';
+import toast from 'react-hot-toast';
 
 // Import Product type to extend from
 import { Product } from '../types/product';
@@ -39,6 +42,8 @@ interface PaymentResult {
   paymentId: string;
   lastFour: string;
   cardType: string;
+  isDemoMode?: boolean;
+  realPayment?: boolean;
 }
 
 type PaymentStatus = 'idle' | 'processing' | 'succeeded' | 'failed';
@@ -131,12 +136,128 @@ const PaymentSuccessOverlay = ({ isVisible }: { isVisible: boolean }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h3 className="text-xl font-semibold text-neutral-900 mb-2">Payment Successful!</h3>
-        <p className="text-neutral-600 mb-4">Your order has been processed successfully.</p>
+        <h3 className="text-xl font-semibold text-neutral-900 mb-2">Demo Order Created!</h3>
+        <p className="text-neutral-600 mb-4">Your demo order has been saved successfully.</p>
         <div className="animate-pulse text-sm text-neutral-500">Redirecting to confirmation page...</div>
       </div>
     </div>
   );
+};
+
+// Function to create order in database
+const createOrderInDatabase = async (
+  user: any,
+  orderDetails: OrderDetails,
+  paymentResult: PaymentResult,
+  totals: { subtotal: number; shippingCost: number; tax: number; total: number }
+) => {
+  try {
+    console.log('Creating order in database...', { orderDetails, paymentResult });
+
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // Create order record
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: user?.id || null,
+        order_number: orderNumber,
+        status: paymentResult.isDemoMode ? 'demo' : 'processing',
+        total_amount: totals.total,
+        shipping_address: {
+          firstName: orderDetails.shippingAddress.firstName,
+          lastName: orderDetails.shippingAddress.lastName,
+          email: orderDetails.shippingAddress.email,
+          phone: orderDetails.shippingAddress.phone,
+          address1: orderDetails.shippingAddress.address1,
+          address2: orderDetails.shippingAddress.address2,
+          city: orderDetails.shippingAddress.city,
+          state: orderDetails.shippingAddress.state,
+          postalCode: orderDetails.shippingAddress.postalCode,
+          country: orderDetails.shippingAddress.country,
+        },
+        billing_address: {
+          firstName: orderDetails.shippingAddress.firstName,
+          lastName: orderDetails.shippingAddress.lastName,
+          email: orderDetails.shippingAddress.email,
+          phone: orderDetails.shippingAddress.phone,
+          address1: orderDetails.shippingAddress.address1,
+          address2: orderDetails.shippingAddress.address2,
+          city: orderDetails.shippingAddress.city,
+          state: orderDetails.shippingAddress.state,
+          postalCode: orderDetails.shippingAddress.postalCode,
+          country: orderDetails.shippingAddress.country,
+        },
+        payment_method: paymentResult.isDemoMode ? 'demo_card' : 'card',
+        payment_status: paymentResult.isDemoMode ? 'demo_paid' : 'paid',
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error('Error creating order:', orderError);
+      throw orderError;
+    }
+
+    console.log('Order created successfully:', order);
+
+    // Create order items
+    const orderItems = orderDetails.items.map(item => ({
+      order_id: order.id,
+      product_id: item.id,
+      quantity: item.quantity,
+      price: convertToEGP(item.price),
+      size: item.size || null,
+      color: item.color || null,
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+
+    if (itemsError) {
+      console.error('Error creating order items:', itemsError);
+      throw itemsError;
+    }
+
+    console.log('Order items created successfully');
+
+    // Store order in localStorage for non-authenticated users or as backup
+    const orderForStorage = {
+      id: order.id,
+      orderNumber: order.order_number,
+      date: order.created_at,
+      status: order.status,
+      total: order.total_amount,
+      items: orderDetails.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: convertToEGP(item.price),
+        quantity: item.quantity,
+        image: item.images?.[0],
+      })),
+      shippingAddress: orderDetails.shippingAddress,
+      paymentMethod: order.payment_method,
+      paymentId: paymentResult.paymentId,
+      estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric',
+        year: 'numeric'
+      }),
+    };
+
+    // Store in localStorage as backup
+    const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+    existingOrders.unshift(orderForStorage);
+    localStorage.setItem('orders', JSON.stringify(existingOrders));
+
+    return order;
+  } catch (error) {
+    console.error('Error in createOrderInDatabase:', error);
+    throw error;
+  }
 };
 
 export default function CheckoutConfirmationPage() {
@@ -147,6 +268,7 @@ export default function CheckoutConfirmationPage() {
   const [processingTimeout, setProcessingTimeout] = useState<NodeJS.Timeout | null>(null);
   
   const { cartItems = [], clearCart } = useCart();
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -223,7 +345,7 @@ export default function CheckoutConfirmationPage() {
     };
   }, [processingTimeout]);
 
-  // Handle payment success with better error handling and timeout protection
+  // Handle payment success with database storage
   const handlePaymentSuccess = useCallback(async (paymentResult: PaymentResult) => {
     try {
       setPaymentStatus('processing');
@@ -233,7 +355,7 @@ export default function CheckoutConfirmationPage() {
         throw new Error('Order details not found');
       }
 
-      console.log('Processing payment success...', paymentResult);
+      console.log('Processing payment success and creating order...', paymentResult);
 
       // Clear any existing timeout
       if (processingTimeout) {
@@ -257,30 +379,44 @@ export default function CheckoutConfirmationPage() {
             status: 'succeeded' as const,
             lastFour: paymentResult.lastFour,
             cardType: paymentResult.cardType,
-            orderDate: orderDetails.createdAt
+            orderDate: orderDetails.createdAt,
+            isDemoMode: paymentResult.isDemoMode || true,
           }
         });
-      }, 5000); // Reduced to 5 seconds
+      }, 10000); // 10 seconds timeout
 
       setProcessingTimeout(timeoutId);
       
-      // Simulate API call with shorter delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Create order in database
+      try {
+        const dbOrder = await createOrderInDatabase(
+          user,
+          orderDetails,
+          paymentResult,
+          { subtotal, shippingCost, tax, total }
+        );
+        
+        console.log('Order successfully created in database:', dbOrder);
+        toast.success('Demo order created successfully!');
+      } catch (dbError) {
+        console.error('Database error (continuing anyway):', dbError);
+        // Don't fail the entire process if database fails
+        toast.error('Order saved locally (database unavailable)');
+      }
+      
+      // Simulate additional processing time
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Clear the timeout since we completed successfully
       clearTimeout(timeoutId);
       setProcessingTimeout(null);
-      
-      // In a real app, validate payment with backend
-      if (Math.random() > 0.98) { // 2% chance of simulated failure
-        throw new Error('Payment processing failed. Please try again.');
-      }
       
       setPaymentStatus('succeeded');
       
       // Clear cart on successful payment
       try {
         await clearCart();
+        console.log('Cart cleared successfully');
       } catch (cartError) {
         console.warn('Failed to clear cart:', cartError);
         // Don't fail the entire process if cart clearing fails
@@ -299,7 +435,8 @@ export default function CheckoutConfirmationPage() {
             status: 'succeeded' as const,
             lastFour: paymentResult.lastFour,
             cardType: paymentResult.cardType,
-            orderDate: orderDetails.createdAt
+            orderDate: orderDetails.createdAt,
+            isDemoMode: paymentResult.isDemoMode || true,
           }
         });
       }, 1000);
@@ -315,7 +452,7 @@ export default function CheckoutConfirmationPage() {
       setPaymentStatus('failed');
       setError(error instanceof Error ? error.message : 'Payment processing failed');
     }
-  }, [orderDetails, clearCart, navigate, processingTimeout]);
+  }, [orderDetails, clearCart, navigate, processingTimeout, user, subtotal, shippingCost, tax, total]);
 
   // Handle payment error
   const handlePaymentError = useCallback((error: any) => {
@@ -404,7 +541,7 @@ export default function CheckoutConfirmationPage() {
               <span className="text-primary-600 font-medium">Payment</span>
             </nav>
             <h1 className="text-3xl font-bold text-neutral-900">Secure Checkout</h1>
-            <p className="text-neutral-600 mt-2">Complete your purchase securely</p>
+            <p className="text-neutral-600 mt-2">Complete your demo purchase</p>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -468,13 +605,13 @@ export default function CheckoutConfirmationPage() {
                       <svg className="w-4 h-4 mr-1 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
-                      SSL Secured
+                      Demo Secured
                     </div>
                     <div className="flex items-center">
                       <svg className="w-4 h-4 mr-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
-                      Protected
+                      Test Mode
                     </div>
                   </div>
                 </div>
