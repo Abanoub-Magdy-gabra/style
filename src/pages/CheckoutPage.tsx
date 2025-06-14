@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -33,35 +34,88 @@ export default function CheckoutPage() {
   const tax = subtotal * VAT_RATE;
   const total = subtotal + shippingCost + tax;
 
-  const handleShippingSubmit = (address: ShippingAddress) => {
-    setShippingAddress(address);
-    if (shippingMethod) {
-      proceedToPayment();
+  const handleShippingSubmit = async (address: ShippingAddress) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Shipping address submitted:', address);
+      
+      // Validate address
+      if (!address.firstName || !address.lastName || !address.email || !address.address1 || !address.city) {
+        throw new Error('Please fill in all required fields');
+      }
+      
+      setShippingAddress(address);
+      
+      // If shipping method is already selected, proceed to payment
+      if (shippingMethod) {
+        proceedToPayment(address, shippingMethod);
+      }
+    } catch (error) {
+      console.error('Error submitting shipping address:', error);
+      setError(error instanceof Error ? error.message : 'Failed to save shipping address');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleShippingMethodSelect = (method: ShippingMethod) => {
-    setShippingMethod(method);
-    if (shippingAddress) {
-      proceedToPayment();
+  const handleShippingMethodSelect = async (method: ShippingMethod) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Shipping method selected:', method);
+      
+      setShippingMethod(method);
+      
+      // If shipping address is already filled, proceed to payment
+      if (shippingAddress) {
+        proceedToPayment(shippingAddress, method);
+      }
+    } catch (error) {
+      console.error('Error selecting shipping method:', error);
+      setError(error instanceof Error ? error.message : 'Failed to select shipping method');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const proceedToPayment = () => {
-    if (shippingAddress && shippingMethod) {
+  const proceedToPayment = (address: ShippingAddress, method: ShippingMethod) => {
+    try {
+      console.log('Proceeding to payment with:', { address, method, cartItems });
+      
+      // Validate all required data
+      if (!address || !method || cartItems.length === 0) {
+        throw new Error('Missing required checkout information');
+      }
+      
+      // Navigate to payment page with all required data
       navigate('/checkout/confirmation', {
         state: {
-          shippingAddress,
-          shippingMethod: shippingMethod.id,
+          shippingAddress: address,
+          shippingMethod: method.id,
           cartItems,
           totals: {
             subtotal,
-            shippingCost,
+            shippingCost: method.price,
             tax,
-            total,
+            total: subtotal + method.price + tax,
           },
         },
+        replace: false
       });
+    } catch (error) {
+      console.error('Error proceeding to payment:', error);
+      setError(error instanceof Error ? error.message : 'Failed to proceed to payment');
+    }
+  };
+
+  const handleManualProceed = () => {
+    if (shippingAddress && shippingMethod) {
+      proceedToPayment(shippingAddress, shippingMethod);
+    } else {
+      setError('Please complete both shipping address and method selection');
     }
   };
 
@@ -142,6 +196,24 @@ export default function CheckoutPage() {
               </div>
             )}
 
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-red-800 text-sm font-medium">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {/* Shipping Form */}
             <ShippingForm
               onSubmit={handleShippingSubmit}
@@ -158,12 +230,37 @@ export default function CheckoutPage() {
             {shippingAddress && shippingMethod && (
               <div className="flex justify-end">
                 <button
-                  onClick={proceedToPayment}
+                  onClick={handleManualProceed}
                   disabled={isLoading}
-                  className="px-6 py-3 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Continue to Payment
+                  {isLoading ? 'Processing...' : 'Continue to Payment'}
                 </button>
+              </div>
+            )}
+
+            {/* Progress Indicator */}
+            {(!shippingAddress || !shippingMethod) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-blue-800 font-medium mb-2">Complete these steps to continue:</h3>
+                <ul className="text-blue-700 text-sm space-y-1">
+                  <li className={`flex items-center ${shippingAddress ? 'line-through opacity-60' : ''}`}>
+                    <span className={`w-4 h-4 rounded-full mr-2 flex items-center justify-center text-xs ${
+                      shippingAddress ? 'bg-green-500 text-white' : 'bg-blue-200 text-blue-800'
+                    }`}>
+                      {shippingAddress ? '✓' : '1'}
+                    </span>
+                    Fill in shipping address
+                  </li>
+                  <li className={`flex items-center ${shippingMethod ? 'line-through opacity-60' : ''}`}>
+                    <span className={`w-4 h-4 rounded-full mr-2 flex items-center justify-center text-xs ${
+                      shippingMethod ? 'bg-green-500 text-white' : 'bg-blue-200 text-blue-800'
+                    }`}>
+                      {shippingMethod ? '✓' : '2'}
+                    </span>
+                    Select shipping method
+                  </li>
+                </ul>
               </div>
             )}
           </div>

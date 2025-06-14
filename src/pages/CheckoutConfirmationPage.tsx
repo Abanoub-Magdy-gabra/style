@@ -27,8 +27,10 @@ interface ShippingAddress {
   lastName: string;
   email: string;
   phone: string;
-  address: string;
+  address1: string;
+  address2?: string;
   city: string;
+  state: string;
   postalCode: string;
   country: string;
 }
@@ -148,41 +150,67 @@ export default function CheckoutConfirmationPage() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Get data from location state with validation
+  // Get data from location state with validation and fallbacks
   const shippingAddress = location.state?.shippingAddress as ShippingAddress;
   const shippingMethod = location.state?.shippingMethod || 'standard';
   
   // Calculate order totals
   const { safeCartItems, subtotal, shippingCost, tax, total } = useOrderCalculations(cartItems, shippingMethod);
 
-  // Validate required data
+  // Validate required data with better error handling
   const isValidCheckout = useMemo(() => {
+    console.log('Validating checkout data:', {
+      hasShippingAddress: !!shippingAddress,
+      hasCartItems: safeCartItems.length > 0,
+      shippingAddressValid: shippingAddress && 
+        shippingAddress.firstName && 
+        shippingAddress.email && 
+        shippingAddress.address1,
+      cartItemsCount: safeCartItems.length
+    });
+
     return shippingAddress && 
            safeCartItems.length > 0 && 
            shippingAddress.firstName && 
            shippingAddress.email && 
-           shippingAddress.address;
+           shippingAddress.address1;
   }, [shippingAddress, safeCartItems]);
 
-  // Initialize order details
+  // Initialize order details with better error handling
   useEffect(() => {
+    console.log('Initializing order details...', {
+      isValidCheckout,
+      isInitialized,
+      cartItemsLength: safeCartItems.length,
+      total
+    });
+
     if (!isValidCheckout) {
+      console.log('Invalid checkout data detected');
       return;
     }
 
     if (!isInitialized) {
-      const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      
-      setOrderDetails({
-        orderId,
-        amount: total,
-        items: safeCartItems,
-        shippingAddress,
-        paymentMethod: 'card',
-        createdAt: new Date()
-      });
-      
-      setIsInitialized(true);
+      try {
+        const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        
+        const newOrderDetails: OrderDetails = {
+          orderId,
+          amount: total,
+          items: safeCartItems,
+          shippingAddress,
+          paymentMethod: 'card',
+          createdAt: new Date()
+        };
+
+        console.log('Created order details:', newOrderDetails);
+        
+        setOrderDetails(newOrderDetails);
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error creating order details:', error);
+        setError('Failed to prepare order. Please try again.');
+      }
     }
   }, [isValidCheckout, total, safeCartItems, shippingAddress, isInitialized]);
 
@@ -204,6 +232,8 @@ export default function CheckoutConfirmationPage() {
       if (!orderDetails) {
         throw new Error('Order details not found');
       }
+
+      console.log('Processing payment success...', paymentResult);
 
       // Clear any existing timeout
       if (processingTimeout) {
@@ -230,12 +260,12 @@ export default function CheckoutConfirmationPage() {
             orderDate: orderDetails.createdAt
           }
         });
-      }, 10000); // 10 second timeout
+      }, 5000); // Reduced to 5 seconds
 
       setProcessingTimeout(timeoutId);
       
       // Simulate API call with shorter delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       // Clear the timeout since we completed successfully
       clearTimeout(timeoutId);
@@ -272,7 +302,7 @@ export default function CheckoutConfirmationPage() {
             orderDate: orderDetails.createdAt
           }
         });
-      }, 1500);
+      }, 1000);
     } catch (error) {
       console.error('Payment processing error:', error);
       
@@ -341,8 +371,19 @@ export default function CheckoutConfirmationPage() {
     );
   }
 
-  if (!orderDetails) {
+  if (!orderDetails && isValidCheckout) {
     return <LoadingSpinner message="Preparing your order..." />;
+  }
+
+  if (!orderDetails) {
+    return (
+      <ErrorDisplay
+        title="Order Preparation Failed"
+        message="There was an issue preparing your order. Please try again."
+        actionText="Go to Cart"
+        onAction={goToCart}
+      />
+    );
   }
 
   return (
