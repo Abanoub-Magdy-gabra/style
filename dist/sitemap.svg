@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Styles -->
+  <style>
+    .page { fill: #f0f8ff; stroke: #4682b4; stroke-width: 2; }
+    .main-page { fill: #e6f2ff; stroke: #1e90ff; stroke-width: 3; }
+    .page-text { font-family: Arial, sans-serif; font-size: 14px; text-anchor: middle; }
+    .main-page-text { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; text-anchor: middle; }
+    .connection { stroke: #708090; stroke-width: 1.5; }
+    .group { fill: #f5f5f5; stroke: #a9a9a9; stroke-width: 1; opacity: 0.3; }
+    .group-label { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #696969; }
+  </style>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="white"/>
+  
+  <!-- Page Groups -->
+  <g>
+    <!-- Main Group -->
+    <rect x="500" y="50" width="200" height="100" rx="10" class="group" />
+    <text x="600" y="40" class="group-label">Main</text>
+    
+    <!-- Account Group -->
+    <rect x="50" y="200" width="300" height="150" rx="10" class="group" />
+    <text x="200" y="190" class="group-label">Account</text>
+    
+    <!-- Shopping Group -->
+    <rect x="400" y="200" width="400" height="150" rx="10" class="group" />
+    <text x="600" y="190" class="group-label">Shopping</text>
+    
+    <!-- Checkout Group -->
+    <rect x="850" y="200" width="300" height="150" rx="10" class="group" />
+    <text x="1000" y="190" class="group-label">Checkout</text>
+    
+    <!-- Blog Group -->
+    <rect x="50" y="400" width="300" height="150" rx="10" class="group" />
+    <text x="200" y="390" class="group-label">Blog</text>
+    
+    <!-- Gift Cards Group -->
+    <rect x="400" y="400" width="400" height="150" rx="10" class="group" />
+    <text x="600" y="390" class="group-label">Gift Cards</text>
+    
+    <!-- Orders Group -->
+    <rect x="850" y="400" width="300" height="150" rx="10" class="group" />
+    <text x="1000" y="390" class="group-label">Orders</text>
+    
+    <!-- Other Group -->
+    <rect x="400" y="600" width="400" height="150" rx="10" class="group" />
+    <text x="600" y="590" class="group-label">Other</text>
+  </g>
+
+  <!-- Pages -->
+  <!-- Main Pages -->
+  <g>
+    <rect x="550" y="80" width="100" height="50" rx="5" class="main-page" />
+    <text x="600" y="110" class="main-page-text">HomePage</text>
+  </g>
+
+  <!-- Account Pages -->
+  <g>
+    <rect x="80" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="130" y="255" class="page-text">LoginPage</text>
+    
+    <rect x="220" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="270" y="255" class="page-text">RegisterPage</text>
+    
+    <rect x="150" y="290" width="100" height="40" rx="5" class="page" />
+    <text x="200" y="315" class="page-text">ProfilePage</text>
+  </g>
+
+  <!-- Shopping Pages -->
+  <g>
+    <rect x="430" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="480" y="255" class="page-text">ShopPage</text>
+    
+    <rect x="550" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="600" y="255" class="page-text">ProductPage</text>
+    
+    <rect x="670" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="720" y="255" class="page-text">CartPage</text>
+    
+    <rect x="550" y="290" width="100" height="40" rx="5" class="page" />
+    <text x="600" y="315" class="page-text">StyleQuizPage</text>
+  </g>
+
+  <!-- Checkout Pages -->
+  <g>
+    <rect x="880" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="930" y="255" class="page-text">CheckoutPage</text>
+    
+    <rect x="1020" y="230" width="100" height="40" rx="5" class="page" />
+    <text x="1070" y="255" class="page-text">CheckoutConfirmationPage</text>
+  </g>
+
+  <!-- Blog Pages -->
+  <g>
+    <rect x="80" y="430" width="100" height="40" rx="5" class="page" />
+    <text x="130" y="455" class="page-text">BlogHomePage</text>
+    
+    <rect x="220" y="430" width="100" height="40" rx="5" class="page" />
+    <text x="270" y="455" class="page-text">BlogPage</text>
+  </g>
+
+  <!-- Gift Card Pages -->
+  <g>
+    <rect x="430" y="430" width="100" height="40" rx="5" class="page" />
+    <text x="480" y="455" class="page-text">GiftCardsPage</text>
+    
+    <rect x="550" y="430" width="100" height="40" rx="5" class="page" />
+    <text x="600" y="455" class="page-text">GiftCardPurchasePage</text>
+    
+    <rect x="670" y="430" width="100" height="40" rx="5" class="page" />
+    <text x="720" y="455" class="page-text">GiftCardRedeemPage</text>
+  </g>
+
+  <!-- Orders Pages -->
+  <g>
+    <rect x="880" y="430" width="100" height="40" rx="5" class="page" />
+    <text x="930" y="455" class="page-text">OrdersPage</text>
+    
+    <rect x="950" y="490" width="100" height="40" rx="5" class="page" />
+    <text x="1000" y="515" class="page-text">OrderDetailPage</text>
+    
+    <rect x="810" y="490" width="100" height="40" rx="5" class="page" />
+    <text x="860" y="515" class="page-text">OrderConfirmationPage</text>
+  </g>
+
+  <!-- Other Pages -->
+  <g>
+    <rect x="550" y="630" width="100" height="40" rx="5" class="page" />
+    <text x="600" y="655" class="page-text">SustainabilityPage</text>
+  </g>
+
+  <!-- Connections -->
+  <!-- Main to Groups -->
+  <line x1="600" y1="130" x2="600" y2="200" class="connection" />
+  <line x1="600" y1="130" x2="200" y2="200" class="connection" />
+  <line x1="600" y1="130" x2="1000" y2="200" class="connection" />
+  
+  <!-- Shopping Flow -->
+  <line x1="480" y1="250" x2="550" y2="250" class="connection" />
+  <line x1="600" y1="250" x2="670" y2="250" class="connection" />
+  <line x1="720" y1="250" x2="880" y2="250" class="connection" />
+  
+  <!-- Checkout Flow -->
+  <line x1="930" y1="250" x2="1020" y2="250" class="connection" />
+  <line x1="1070" y1="270" x2="1000" y2="490" class="connection" />
+  
+  <!-- Blog Flow -->
+  <line x1="130" y1="450" x2="220" y2="450" class="connection" />
+  
+  <!-- Gift Card Flow -->
+  <line x1="480" y1="450" x2="550" y2="450" class="connection" />
+  <line x1="600" y1="450" x2="670" y2="450" class="connection" />
+  
+  <!-- Orders Flow -->
+  <line x1="930" y1="470" x2="950" y2="490" class="connection" />
+  <line x1="930" y1="470" x2="810" y2="490" class="connection" />
+  
+  <!-- Account Connections -->
+  <line x1="130" y1="270" x2="150" y2="290" class="connection" />
+  <line x1="270" y1="270" x2="200" y2="290" class="connection" />
+</svg>
