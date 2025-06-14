@@ -157,26 +157,38 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
       return;
     }
 
+    if (isSubmitting || isProcessing || disabled) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrors({});
 
     try {
-      // In a real app, you would send the payment details to your backend
-      // Here we'll simulate a successful payment
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Simulate payment processing with shorter timeout
+      const processingTime = Math.random() * 1000 + 500; // 500ms to 1.5s
+      await new Promise(resolve => setTimeout(resolve, processingTime));
       
-      onSuccess({
+      // Simulate occasional failures (2% chance)
+      if (Math.random() < 0.02) {
+        throw new Error('Payment declined. Please check your card details and try again.');
+      }
+      
+      const paymentResult = {
         paymentId: `pay_${Math.random().toString(36).substr(2, 16)}`,
         status: 'succeeded',
         timestamp: new Date().toISOString(),
-        lastFour: formData.cardNumber.slice(-4),
+        lastFour: formData.cardNumber.replace(/\s/g, '').slice(-4),
         cardType: getCardType(formData.cardNumber)
-      });
+      };
+      
+      onSuccess(paymentResult);
       
     } catch (err) {
       console.error('Payment error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Payment processing failed. Please try again.';
       setErrors({
-        payment: 'An unexpected error occurred. Please try again.'
+        payment: errorMessage
       });
       onError(err);
     } finally {
@@ -192,6 +204,8 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
     if (/^6(?:011|5)/.test(number)) return 'Discover';
     return 'Card';
   };
+
+  const isFormDisabled = isSubmitting || isProcessing || disabled;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -210,13 +224,17 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
                 e.target.value = formatCardNumber(e.target.value);
                 handleChange(e);
               }}
+              onBlur={handleBlur}
               maxLength={19}
               placeholder="0000 0000 0000 0000"
+              disabled={isFormDisabled}
               className={`mt-1 block w-full rounded-md border ${
                 errors.cardNumber ? 'border-red-500' : 'border-neutral-300'
-              } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm`}
-              onBlur={handleBlur}
+              } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm disabled:bg-neutral-100 disabled:cursor-not-allowed`}
             />
+            {errors.cardNumber && (
+              <p className="mt-1 text-sm text-red-600">{errors.cardNumber}</p>
+            )}
           </div>
           
           <div>
@@ -231,10 +249,14 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
               onChange={handleChange}
               onBlur={handleBlur}
               placeholder="John Doe"
+              disabled={isFormDisabled}
               className={`mt-1 block w-full rounded-md border ${
                 errors.cardName ? 'border-red-500' : 'border-neutral-300'
-              } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm`}
+              } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm disabled:bg-neutral-100 disabled:cursor-not-allowed`}
             />
+            {errors.cardName && (
+              <p className="mt-1 text-sm text-red-600">{errors.cardName}</p>
+            )}
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -251,13 +273,17 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
                   e.target.value = formatExpiryDate(e.target.value);
                   handleChange(e);
                 }}
+                onBlur={handleBlur}
                 maxLength={5}
                 placeholder="MM/YY"
+                disabled={isFormDisabled}
                 className={`mt-1 block w-full rounded-md border ${
                 errors.expiryDate ? 'border-red-500' : 'border-neutral-300'
-              } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm`}
-                onBlur={handleBlur}
+              } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm disabled:bg-neutral-100 disabled:cursor-not-allowed`}
               />
+              {errors.expiryDate && (
+                <p className="mt-1 text-sm text-red-600">{errors.expiryDate}</p>
+              )}
             </div>
             
             <div>
@@ -273,10 +299,14 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
                 onBlur={handleBlur}
                 maxLength={4}
                 placeholder="123"
+                disabled={isFormDisabled}
                 className={`mt-1 block w-full rounded-md border ${
                   errors.cvv ? 'border-red-500' : 'border-neutral-300'
-                } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm`}
+                } shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm disabled:bg-neutral-100 disabled:cursor-not-allowed`}
               />
+              {errors.cvv && (
+                <p className="mt-1 text-sm text-red-600">{errors.cvv}</p>
+              )}
             </div>
           </div>
         </div>
@@ -286,9 +316,10 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
             id="save-card"
             name="saveCard"
             type="checkbox"
-            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded disabled:cursor-not-allowed"
             checked={formData.saveCard}
             onChange={handleChange}
+            disabled={isFormDisabled}
           />
           <label htmlFor="save-card" className="ml-2 block text-sm text-neutral-700">
             Save card for future purchases
@@ -305,9 +336,9 @@ export default function CheckoutForm({ onSuccess, onError, isProcessing, disable
       <div className="mt-6">
         <button
           type="submit"
-          disabled={isSubmitting || isProcessing || disabled}
-          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
-            (isSubmitting || isProcessing || disabled) ? 'opacity-75 cursor-not-allowed' : ''
+          disabled={isFormDisabled}
+          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors ${
+            isFormDisabled ? 'opacity-75 cursor-not-allowed hover:bg-primary-600' : ''
           }`}
         >
           {isSubmitting || isProcessing ? (
